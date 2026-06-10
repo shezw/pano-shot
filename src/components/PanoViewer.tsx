@@ -101,7 +101,7 @@ const correctionFragmentShader = `
   }
 
   void main() {
-    vec2 screen = vUv * 2.0 - 1.0;
+    vec2 screen = vec2(vUv.x, 1.0 - vUv.y) * 2.0 - 1.0;
     screen.x *= aspect;
 
     float scale = tan(radians(fov) * 0.5);
@@ -110,7 +110,7 @@ const correctionFragmentShader = `
 
     float longitude = atan(direction.x, -direction.z);
     float latitude = asin(clamp(direction.y, -1.0, 1.0));
-    float u = longitude / (2.0 * PI) + 0.5;
+    float u = longitude / (2.0 * PI) + 0.75;
     float v = 0.5 - latitude / PI;
 
     if (mirror > 0.5) {
@@ -118,6 +118,7 @@ const correctionFragmentShader = `
     }
 
     gl_FragColor = texture2D(panorama, vec2(fract(u), clamp(v, 0.0, 1.0)));
+    #include <colorspace_fragment>
   }
 `;
 
