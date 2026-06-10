@@ -4,7 +4,9 @@ import {
   FileButton,
   Group,
   SegmentedControl,
+  Slider,
   Switch,
+  Text,
   Tooltip,
 } from '@mantine/core';
 import {
@@ -29,9 +31,11 @@ type ToolbarProps = {
   lensId: LensId;
   isMirrored: boolean;
   isDistortionCorrectionEnabled: boolean;
+  distortionCorrectionAmount: number;
   onLensChange: (lensId: LensId) => void;
   onToggleMirror: () => void;
   onDistortionCorrectionChange: (enabled: boolean) => void;
+  onDistortionCorrectionAmountChange: (amount: number) => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
   onCapture: () => void;
@@ -56,9 +60,11 @@ export function Toolbar({
   lensId,
   isMirrored,
   isDistortionCorrectionEnabled,
+  distortionCorrectionAmount,
   onLensChange,
   onToggleMirror,
   onDistortionCorrectionChange,
+  onDistortionCorrectionAmountChange,
   onCameraAction,
   onFileSelected,
   onCapture,
@@ -101,6 +107,25 @@ export function Toolbar({
           onChange={(event) => onDistortionCorrectionChange(event.currentTarget.checked)}
           size="sm"
         />
+
+        <Group className="distortion-control" gap={8} wrap="nowrap">
+          <Slider
+            aria-label="去畸变强度"
+            value={distortionCorrectionAmount}
+            onChange={onDistortionCorrectionAmountChange}
+            min={-50}
+            max={150}
+            step={5}
+            disabled={!isDistortionCorrectionEnabled}
+            size="xs"
+            color="blue"
+            label={(value) => `${value}%`}
+            thumbProps={{ 'aria-label': '去畸变强度' }}
+          />
+          <Text className="distortion-value" size="xs" c="dimmed" aria-live="polite">
+            {distortionCorrectionAmount}%
+          </Text>
+        </Group>
 
         <SegmentedControl
           aria-label="镜头选择"

@@ -40,6 +40,7 @@ type PanoViewerProps = {
   pose: CameraPose;
   isMirrored: boolean;
   isDistortionCorrectionEnabled: boolean;
+  distortionCorrectionAmount: number;
   onPoseChange: (pose: CameraPose) => void;
 };
 
@@ -112,7 +113,15 @@ function getCorrectionStrength(lens: ReturnType<typeof getLensById>, pose: Camer
 }
 
 export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function PanoViewer(
-  { imageUrl, lensId, pose, isMirrored, isDistortionCorrectionEnabled, onPoseChange },
+  {
+    imageUrl,
+    lensId,
+    pose,
+    isMirrored,
+    isDistortionCorrectionEnabled,
+    distortionCorrectionAmount,
+    onPoseChange,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -131,6 +140,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   const latestLensRef = useRef(lensId);
   const latestMirrorRef = useRef(isMirrored);
   const latestCorrectionRef = useRef(isDistortionCorrectionEnabled);
+  const latestCorrectionAmountRef = useRef(distortionCorrectionAmount);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,6 +148,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   latestLensRef.current = lensId;
   latestMirrorRef.current = isMirrored;
   latestCorrectionRef.current = isDistortionCorrectionEnabled;
+  latestCorrectionAmountRef.current = distortionCorrectionAmount;
 
   useImperativeHandle(ref, () => ({
     capture: () =>
@@ -228,7 +239,10 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       const yaw = toRadians(activePose.yaw);
       const pitch = toRadians(activePose.pitch);
       const effectiveFov = getEffectiveFov(activeLens.fov, activePose.dolly);
-      const useCorrection = shouldUseCorrection(latestCorrectionRef.current, activeLens, activePose);
+      const correctionAmount = latestCorrectionAmountRef.current / 100;
+      const useCorrection =
+        correctionAmount !== 0 &&
+        shouldUseCorrection(latestCorrectionRef.current, activeLens, activePose);
 
       sphere.scale.x = latestMirrorRef.current ? 1 : -1;
       camera.fov = effectiveFov;
@@ -238,11 +252,8 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
 
       if (useCorrection) {
         correctionUniforms.fov.value = effectiveFov;
-        correctionUniforms.correctionStrength.value = getCorrectionStrength(
-          activeLens,
-          activePose,
-          effectiveFov,
-        );
+        correctionUniforms.correctionStrength.value =
+          getCorrectionStrength(activeLens, activePose, effectiveFov) * correctionAmount;
         renderer.setRenderTarget(correctionTarget);
         renderer.render(scene, camera);
         renderer.setRenderTarget(null);

@@ -9,9 +9,11 @@ function renderToolbar(overrides = {}) {
     lensId: 'panorama' as const,
     isMirrored: false,
     isDistortionCorrectionEnabled: true,
+    distortionCorrectionAmount: 100,
     onLensChange: vi.fn(),
     onToggleMirror: vi.fn(),
     onDistortionCorrectionChange: vi.fn(),
+    onDistortionCorrectionAmountChange: vi.fn(),
     onCameraAction: vi.fn(),
     onFileSelected: vi.fn(),
     onCapture: vi.fn(),
@@ -74,5 +76,18 @@ describe('Toolbar', () => {
     await user.click(screen.getByRole('switch', { name: '去畸变' }));
 
     expect(props.onDistortionCorrectionChange).toHaveBeenCalledWith(false);
+  });
+
+  it('emits distortion correction amount changes', async () => {
+    const user = userEvent.setup();
+    const props = renderToolbar();
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('aria-valuemin', '-50');
+    expect(slider).toHaveAttribute('aria-valuemax', '150');
+    await user.click(slider);
+    await user.keyboard('{ArrowRight}');
+
+    expect(props.onDistortionCorrectionAmountChange).toHaveBeenCalled();
   });
 });

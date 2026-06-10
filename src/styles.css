@@ -68,6 +68,23 @@ select {
   min-width: 82px;
 }
 
+.distortion-control {
+  flex: 0 0 auto;
+  width: 170px;
+  padding-inline: 2px 8px;
+}
+
+.distortion-control .mantine-Slider-root {
+  flex: 1 1 auto;
+  min-width: 96px;
+}
+
+.distortion-value {
+  width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .lens-control {
   flex: 0 0 auto;
   min-width: 500px;
