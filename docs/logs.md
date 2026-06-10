@@ -1,0 +1,29 @@
+### 2026-06-10 21:43:18 CST - 工程初始化
+
+目标：根据 `docs/todo.md` 搭建 React + TypeScript 单页工具工程。
+
+实现方式：创建 Vite 工程配置、TypeScript 配置、Vitest 测试环境、入口 HTML 和 React 挂载入口；引入 Mantine、Tabler Icons、Three.js、Vitest 与 Testing Library，并生成 `package-lock.json`。
+
+### 2026-06-10 21:43:18 CST - 全景预览与镜头功能
+
+目标：提供黑色网点背景、顶部工具栏、16:9 全景预览区、镜头选择与视角控制能力。
+
+实现方式：使用 Three.js 创建球面内侧贴图预览，将附带的 `assets/prono-0610-1534.png` 作为默认全景图；镜头焦段通过预设 FOV 映射实现，切换镜头时保留当前 yaw、pitch 与 dolly；控制按钮通过纯函数更新虚拟摄像机的水平角、俯仰角和前后偏移。
+
+### 2026-06-10 21:43:18 CST - 图片选择与拍照保存
+
+目标：支持本地图片替换与按当前镜头视窗截图保存。
+
+实现方式：使用 Mantine `FileButton` 读取本地图片并以 Object URL 替换当前贴图；Three.js renderer 开启 `preserveDrawingBuffer`，拍照时从 canvas 生成 PNG Blob，并按 `prono-shot-{camera}-{degree}-{datetime}.png` 格式触发本地下载。
+
+### 2026-06-10 21:43:18 CST - 测试与验证
+
+目标：完成镜头选择和镜头控制能力的单元/UI 验证。
+
+实现方式：新增镜头预设、文件名生成、角度归一化、俯仰限制、控制动作等单元测试；新增工具栏 UI 测试，覆盖焦段切换、镜头控制按钮和拍照按钮事件。已执行 `npm test`，结果为 3 个测试文件、10 个测试全部通过；已执行 `npm run build`，TypeScript 和生产构建均通过。
+
+### 2026-06-10 21:43:18 CST - 浏览器验收
+
+目标：使用附带图片进行实际页面验证。
+
+实现方式：启动本地开发服务并在浏览器打开 `http://localhost:5173/`；确认工具栏、默认全景图、16:9 预览区渲染正常；点击 `50mm` 后视野收窄，点击 `左10` 与 `上仰20` 后状态更新为 `Yaw -10 deg / Pitch 20 deg / Offset 0.0`。Codex 内置浏览器不支持下载事件捕获，因此下载动作未在该浏览器中完成自动化断言；普通浏览器会使用原生 `<a download>` 保存截图。
