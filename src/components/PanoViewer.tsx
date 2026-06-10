@@ -88,28 +88,14 @@ const correctionFragmentShader = `
 
   const float PI = 3.1415926535897932384626433832795;
 
-  vec3 rotateX(vec3 value, float angle) {
-    float s = sin(angle);
-    float c = cos(angle);
-    return vec3(value.x, c * value.y - s * value.z, s * value.y + c * value.z);
-  }
-
-  vec3 rotateY(vec3 value, float angle) {
-    float s = sin(angle);
-    float c = cos(angle);
-    return vec3(c * value.x + s * value.z, value.y, -s * value.x + c * value.z);
-  }
-
   void main() {
     vec2 screen = vec2(vUv.x, 1.0 - vUv.y) * 2.0 - 1.0;
     screen.x *= aspect;
 
-    float scale = tan(radians(fov) * 0.5);
-    vec3 direction = normalize(vec3(screen.x * scale, screen.y * scale, -1.0));
-    direction = rotateY(rotateX(direction, pitch), yaw);
-
-    float longitude = atan(direction.x, -direction.z);
-    float latitude = asin(clamp(direction.y, -1.0, 1.0));
+    float verticalHalfFov = radians(fov) * 0.5;
+    float horizontalHalfFov = atan(tan(verticalHalfFov) * aspect);
+    float longitude = yaw + screen.x * horizontalHalfFov;
+    float latitude = clamp(pitch + screen.y * verticalHalfFov, -PI * 0.49, PI * 0.49);
     float u = longitude / (2.0 * PI) + 0.75;
     float v = 0.5 - latitude / PI;
 
