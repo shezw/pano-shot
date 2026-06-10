@@ -44,5 +44,7 @@ describe('camera controls', () => {
     expect(getEffectiveFov(75, 0)).toBe(75);
     expect(getEffectiveFov(75, 0.2)).toBeLessThan(75);
     expect(getEffectiveFov(75, -0.2)).toBeGreaterThan(75);
+    expect(getEffectiveFov(50, 3.5)).toBeLessThan(5);
+    expect(getEffectiveFov(10, 3.5)).toBe(2);
   });
 });

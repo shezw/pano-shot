@@ -232,7 +232,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     onPoseChange({
       ...drag.startPose,
       yaw: normalizeYaw(drag.startPose.yaw + deltaX * sensitivity),
-      pitch: clampPitch(drag.startPose.pitch - deltaY * sensitivity),
+      pitch: clampPitch(drag.startPose.pitch + deltaY * sensitivity),
     });
   };
 

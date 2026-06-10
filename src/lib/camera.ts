@@ -44,10 +44,10 @@ export const CAMERA_CONTROLS: CameraControl[] = [
 
 const MIN_PITCH = -85;
 const MAX_PITCH = 85;
-const MIN_DOLLY = -0.7;
-const MAX_DOLLY = 1.8;
+const MIN_DOLLY = -3;
+const MAX_DOLLY = 2;
 const DOLLY_STEP = 0.2;
-const MIN_EFFECTIVE_FOV = 6;
+const MIN_EFFECTIVE_FOV = 2;
 const MAX_EFFECTIVE_FOV = 110;
 
 export function normalizeYaw(value: number) {
