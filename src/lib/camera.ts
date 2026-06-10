@@ -44,8 +44,8 @@ export const CAMERA_CONTROLS: CameraControl[] = [
 
 const MIN_PITCH = -85;
 const MAX_PITCH = 85;
-const MIN_DOLLY = -3;
-const MAX_DOLLY = 2;
+const MIN_DOLLY = -2.4;
+const MAX_DOLLY = 3.5;
 const DOLLY_STEP = 0.2;
 const MIN_EFFECTIVE_FOV = 2;
 const MAX_EFFECTIVE_FOV = 110;

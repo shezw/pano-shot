@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyDollyDelta,
   applyCameraAction,
   clampPitch,
   DEFAULT_CAMERA_POSE,
@@ -46,5 +47,10 @@ describe('camera controls', () => {
     expect(getEffectiveFov(75, -0.2)).toBeGreaterThan(75);
     expect(getEffectiveFov(50, 3.5)).toBeLessThan(5);
     expect(getEffectiveFov(10, 3.5)).toBe(2);
+  });
+
+  it('allows a wider zoom range for telephoto lenses', () => {
+    expect(applyDollyDelta(DEFAULT_CAMERA_POSE, 5).dolly).toBe(3.5);
+    expect(applyDollyDelta(DEFAULT_CAMERA_POSE, -5).dolly).toBe(-2.4);
   });
 });
