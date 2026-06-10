@@ -64,6 +64,7 @@ type CorrectionUniforms = {
   fov: { value: number };
   aspect: { value: number };
   mirror: { value: number };
+  correctionStrength: { value: number };
 };
 
 const correctionVertexShader = `
@@ -84,6 +85,7 @@ const correctionFragmentShader = `
   uniform float fov;
   uniform float aspect;
   uniform float mirror;
+  uniform float correctionStrength;
   varying vec2 vUv;
 
   const float PI = 3.1415926535897932384626433832795;
@@ -92,10 +94,14 @@ const correctionFragmentShader = `
     vec2 screen = vec2(vUv.x, 1.0 - vUv.y) * 2.0 - 1.0;
     screen.x *= aspect;
 
+    vec2 normalizedScreen = vec2(screen.x / aspect, screen.y);
+    vec2 antiStretch = normalizedScreen * normalizedScreen * normalizedScreen - normalizedScreen;
+    normalizedScreen += antiStretch * correctionStrength;
+
     float verticalHalfFov = radians(fov) * 0.5;
     float horizontalHalfFov = atan(tan(verticalHalfFov) * aspect);
-    float longitude = yaw + screen.x * horizontalHalfFov;
-    float latitude = clamp(pitch + screen.y * verticalHalfFov, -PI * 0.49, PI * 0.49);
+    float longitude = yaw + normalizedScreen.x * horizontalHalfFov;
+    float latitude = clamp(pitch + normalizedScreen.y * verticalHalfFov, -PI * 0.49, PI * 0.49);
     float u = longitude / (2.0 * PI) + 0.75;
     float v = 0.5 - latitude / PI;
 
@@ -114,6 +120,13 @@ function shouldUseCorrection(
   pose: CameraPose,
 ) {
   return enabled && ((lens.focalLength ?? 0) >= 50 || pose.dolly > 0.4);
+}
+
+function getCorrectionStrength(lens: ReturnType<typeof getLensById>, pose: CameraPose, fov: number) {
+  const focalBoost = (lens.focalLength ?? 0) >= 50 ? 0.18 : 0;
+  const zoomOutBoost = pose.dolly < 0 ? Math.min(0.24, Math.abs(pose.dolly) * 0.14) : 0;
+  const wideFovBoost = Math.min(0.18, Math.max(0, (fov - 35) / 75) * 0.18);
+  return Math.min(0.5, focalBoost + zoomOutBoost + wideFovBoost);
 }
 
 export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function PanoViewer(
@@ -190,6 +203,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       fov: { value: getLensById(lensId).fov },
       aspect: { value: 16 / 9 },
       mirror: { value: 0 },
+      correctionStrength: { value: 0 },
     };
     const correctionMaterial = new ShaderMaterial({
       uniforms: correctionUniforms,
@@ -235,6 +249,11 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
         correctionUniforms.pitch.value = pitch;
         correctionUniforms.fov.value = effectiveFov;
         correctionUniforms.mirror.value = latestMirrorRef.current ? 1 : 0;
+        correctionUniforms.correctionStrength.value = getCorrectionStrength(
+          activeLens,
+          activePose,
+          effectiveFov,
+        );
         renderer.render(correctionScene, correctionCamera);
       } else {
         camera.fov = effectiveFov;
