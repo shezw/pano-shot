@@ -44,8 +44,11 @@ export const CAMERA_CONTROLS: CameraControl[] = [
 
 const MIN_PITCH = -85;
 const MAX_PITCH = 85;
-const MIN_DOLLY = -0.6;
-const MAX_DOLLY = 0.6;
+const MIN_DOLLY = -0.7;
+const MAX_DOLLY = 1.8;
+const DOLLY_STEP = 0.2;
+const MIN_EFFECTIVE_FOV = 6;
+const MAX_EFFECTIVE_FOV = 110;
 
 export function normalizeYaw(value: number) {
   const normalized = ((((value + 180) % 360) + 360) % 360) - 180;
@@ -60,14 +63,23 @@ export function clampDolly(value: number) {
   return Math.min(MAX_DOLLY, Math.max(MIN_DOLLY, value));
 }
 
+export function applyDollyDelta(pose: CameraPose, delta: number): CameraPose {
+  return { ...pose, dolly: clampDolly(pose.dolly + delta) };
+}
+
+export function getEffectiveFov(baseFov: number, dolly: number) {
+  const fov = baseFov * Math.pow(2, -dolly);
+  return Math.min(MAX_EFFECTIVE_FOV, Math.max(MIN_EFFECTIVE_FOV, fov));
+}
+
 export function applyCameraAction(pose: CameraPose, action: CameraAction): CameraPose {
   switch (action) {
     case 'reset':
       return DEFAULT_CAMERA_POSE;
     case 'forward':
-      return { ...pose, dolly: clampDolly(pose.dolly + 0.1) };
+      return applyDollyDelta(pose, DOLLY_STEP);
     case 'backward':
-      return { ...pose, dolly: clampDolly(pose.dolly - 0.1) };
+      return applyDollyDelta(pose, -DOLLY_STEP);
     case 'yawLeft10':
       return { ...pose, yaw: normalizeYaw(pose.yaw - 10) };
     case 'yawRight10':

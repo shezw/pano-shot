@@ -13,6 +13,7 @@ export function App() {
   const [pose, setPose] = useState<CameraPose>(DEFAULT_CAMERA_POSE);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isMirrored, setIsMirrored] = useState(false);
 
   const imageUrl = uploadedUrl ?? defaultPanoramaUrl;
 
@@ -27,7 +28,8 @@ export function App() {
   const cameraMeta = useMemo(() => {
     const yaw = Math.round(pose.yaw);
     const pitch = Math.round(pose.pitch);
-    return `Yaw ${yaw} deg / Pitch ${pitch} deg / Offset ${pose.dolly.toFixed(1)}`;
+    const zoom = Math.round(pose.dolly * 100);
+    return `Yaw ${yaw} deg / Pitch ${pitch} deg / Zoom ${zoom > 0 ? '+' : ''}${zoom}`;
   }, [pose]);
 
   const handleFileSelected = (file: File | null) => {
@@ -68,7 +70,9 @@ export function App() {
     <Box className="app-shell">
       <Toolbar
         lensId={lensId}
+        isMirrored={isMirrored}
         onLensChange={setLensId}
+        onToggleMirror={() => setIsMirrored((currentValue) => !currentValue)}
         onCameraAction={(action) => setPose((currentPose) => applyCameraAction(currentPose, action))}
         onFileSelected={handleFileSelected}
         onCapture={handleCapture}
@@ -77,7 +81,14 @@ export function App() {
 
       <main className="preview-shell">
         <section className="viewer-stage" aria-label="全景预览区">
-          <PanoViewer ref={viewerRef} imageUrl={imageUrl} lensId={lensId} pose={pose} />
+          <PanoViewer
+            ref={viewerRef}
+            imageUrl={imageUrl}
+            lensId={lensId}
+            pose={pose}
+            isMirrored={isMirrored}
+            onPoseChange={setPose}
+          />
         </section>
         <Group className="status-line" justify="space-between" wrap="nowrap">
           <Text size="xs" c="dimmed">

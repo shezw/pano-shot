@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applyCameraAction, clampPitch, DEFAULT_CAMERA_POSE, normalizeYaw } from './camera';
+import {
+  applyCameraAction,
+  clampPitch,
+  DEFAULT_CAMERA_POSE,
+  getEffectiveFov,
+  normalizeYaw,
+} from './camera';
 
 describe('camera controls', () => {
   it('normalizes yaw into a stable degree range', () => {
@@ -26,11 +32,17 @@ describe('camera controls', () => {
 
   it('applies forward/backward dolly and reset actions', () => {
     const forward = applyCameraAction(DEFAULT_CAMERA_POSE, 'forward');
-    expect(forward.dolly).toBeCloseTo(0.1);
+    expect(forward.dolly).toBeCloseTo(0.2);
 
     const backward = applyCameraAction(forward, 'backward');
     expect(backward.dolly).toBeCloseTo(0);
 
     expect(applyCameraAction(backward, 'reset')).toEqual(DEFAULT_CAMERA_POSE);
+  });
+
+  it('maps dolly changes to visible field-of-view zoom', () => {
+    expect(getEffectiveFov(75, 0)).toBe(75);
+    expect(getEffectiveFov(75, 0.2)).toBeLessThan(75);
+    expect(getEffectiveFov(75, -0.2)).toBeGreaterThan(75);
   });
 });

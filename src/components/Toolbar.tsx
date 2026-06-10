@@ -15,6 +15,7 @@ import {
   IconCamera,
   IconChevronLeft,
   IconChevronRight,
+  IconFlipHorizontal,
   IconRotateClockwise2,
   IconUpload,
   IconZoomIn,
@@ -25,7 +26,9 @@ import { LENS_OPTIONS, type LensId } from '../lib/lens';
 
 type ToolbarProps = {
   lensId: LensId;
+  isMirrored: boolean;
   onLensChange: (lensId: LensId) => void;
+  onToggleMirror: () => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
   onCapture: () => void;
@@ -48,7 +51,9 @@ const controlIcons: Record<CameraAction, typeof IconRotateClockwise2> = {
 
 export function Toolbar({
   lensId,
+  isMirrored,
   onLensChange,
+  onToggleMirror,
   onCameraAction,
   onFileSelected,
   onCapture,
@@ -70,6 +75,18 @@ export function Toolbar({
             </Button>
           )}
         </FileButton>
+
+        <Tooltip label="镜像" openDelay={250}>
+          <ActionIcon
+            aria-label="镜像"
+            variant={isMirrored ? 'filled' : 'subtle'}
+            color={isMirrored ? 'blue' : 'gray'}
+            size="lg"
+            onClick={onToggleMirror}
+          >
+            <IconFlipHorizontal size={18} />
+          </ActionIcon>
+        </Tooltip>
 
         <SegmentedControl
           aria-label="镜头选择"
