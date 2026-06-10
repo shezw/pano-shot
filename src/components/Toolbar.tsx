@@ -4,6 +4,7 @@ import {
   FileButton,
   Group,
   SegmentedControl,
+  Switch,
   Tooltip,
 } from '@mantine/core';
 import {
@@ -27,8 +28,10 @@ import { LENS_OPTIONS, type LensId } from '../lib/lens';
 type ToolbarProps = {
   lensId: LensId;
   isMirrored: boolean;
+  isDistortionCorrectionEnabled: boolean;
   onLensChange: (lensId: LensId) => void;
   onToggleMirror: () => void;
+  onDistortionCorrectionChange: (enabled: boolean) => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
   onCapture: () => void;
@@ -52,8 +55,10 @@ const controlIcons: Record<CameraAction, typeof IconRotateClockwise2> = {
 export function Toolbar({
   lensId,
   isMirrored,
+  isDistortionCorrectionEnabled,
   onLensChange,
   onToggleMirror,
+  onDistortionCorrectionChange,
   onCameraAction,
   onFileSelected,
   onCapture,
@@ -87,6 +92,15 @@ export function Toolbar({
             <IconFlipHorizontal size={18} />
           </ActionIcon>
         </Tooltip>
+
+        <Switch
+          className="toolbar-switch"
+          aria-label="去畸变"
+          label="去畸变"
+          checked={isDistortionCorrectionEnabled}
+          onChange={(event) => onDistortionCorrectionChange(event.currentTarget.checked)}
+          size="sm"
+        />
 
         <SegmentedControl
           aria-label="镜头选择"

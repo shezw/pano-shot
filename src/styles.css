@@ -63,9 +63,14 @@ select {
   flex: 0 0 auto;
 }
 
+.toolbar-switch {
+  flex: 0 0 auto;
+  min-width: 82px;
+}
+
 .lens-control {
   flex: 0 0 auto;
-  min-width: 640px;
+  min-width: 500px;
 }
 
 .lens-control .mantine-SegmentedControl-label {
@@ -132,7 +137,7 @@ select {
   }
 
   .lens-control {
-    min-width: 560px;
+    min-width: 450px;
   }
 
   .preview-shell {

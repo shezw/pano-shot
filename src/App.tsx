@@ -14,6 +14,7 @@ export function App() {
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isMirrored, setIsMirrored] = useState(false);
+  const [isDistortionCorrectionEnabled, setIsDistortionCorrectionEnabled] = useState(true);
 
   const imageUrl = uploadedUrl ?? defaultPanoramaUrl;
 
@@ -71,8 +72,10 @@ export function App() {
       <Toolbar
         lensId={lensId}
         isMirrored={isMirrored}
+        isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
         onLensChange={setLensId}
         onToggleMirror={() => setIsMirrored((currentValue) => !currentValue)}
+        onDistortionCorrectionChange={setIsDistortionCorrectionEnabled}
         onCameraAction={(action) => setPose((currentPose) => applyCameraAction(currentPose, action))}
         onFileSelected={handleFileSelected}
         onCapture={handleCapture}
@@ -87,6 +90,7 @@ export function App() {
             lensId={lensId}
             pose={pose}
             isMirrored={isMirrored}
+            isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
             onPoseChange={setPose}
           />
         </section>

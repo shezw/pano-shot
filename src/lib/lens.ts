@@ -11,13 +11,13 @@ export type LensOption = {
 
 export const LENS_OPTIONS: LensOption[] = [
   { id: 'panorama', label: '全景预览', fov: 75 },
-  { id: '10mm', label: '10mm', focalLength: 10, fov: 100 },
-  { id: '25mm', label: '25mm', focalLength: 25, fov: 52 },
-  { id: '35mm', label: '35mm', focalLength: 35, fov: 38 },
-  { id: '50mm', label: '50mm', focalLength: 50, fov: 27 },
-  { id: '85mm', label: '85mm', focalLength: 85, fov: 16 },
-  { id: '100mm', label: '100mm', focalLength: 100, fov: 14 },
-  { id: '135mm', label: '135mm', focalLength: 135, fov: 10 },
+  { id: '10mm', label: '10', focalLength: 10, fov: 100 },
+  { id: '25mm', label: '25', focalLength: 25, fov: 52 },
+  { id: '35mm', label: '35', focalLength: 35, fov: 38 },
+  { id: '50mm', label: '50', focalLength: 50, fov: 27 },
+  { id: '85mm', label: '85', focalLength: 85, fov: 16 },
+  { id: '100mm', label: '100', focalLength: 100, fov: 14 },
+  { id: '135mm', label: '135', focalLength: 135, fov: 10 },
 ];
 
 export function getLensById(id: LensId) {

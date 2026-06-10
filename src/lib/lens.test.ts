@@ -14,6 +14,19 @@ describe('lens presets', () => {
     expect(getLensById('panorama').fov).toBe(75);
   });
 
+  it('uses compact focal length labels in the toolbar', () => {
+    expect(LENS_OPTIONS.map((lens) => lens.label)).toEqual([
+      '全景预览',
+      '10',
+      '25',
+      '35',
+      '50',
+      '85',
+      '100',
+      '135',
+    ]);
+  });
+
   it('builds screenshot filenames with lens, degree, and local datetime', () => {
     const date = new Date(2026, 5, 10, 17, 8, 9);
 

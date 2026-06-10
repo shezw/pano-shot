@@ -13,8 +13,11 @@ import {
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
+  OrthographicCamera,
+  PlaneGeometry,
   PerspectiveCamera,
   Scene,
+  ShaderMaterial,
   SphereGeometry,
   SRGBColorSpace,
   Texture,
@@ -35,6 +38,7 @@ type PanoViewerProps = {
   lensId: LensId;
   pose: CameraPose;
   isMirrored: boolean;
+  isDistortionCorrectionEnabled: boolean;
   onPoseChange: (pose: CameraPose) => void;
 };
 
@@ -53,26 +57,104 @@ type DragState = {
   startPose: CameraPose;
 };
 
+type CorrectionUniforms = {
+  panorama: { value: Texture | null };
+  yaw: { value: number };
+  pitch: { value: number };
+  fov: { value: number };
+  aspect: { value: number };
+  mirror: { value: number };
+};
+
+const correctionVertexShader = `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+
+const correctionFragmentShader = `
+  precision highp float;
+
+  uniform sampler2D panorama;
+  uniform float yaw;
+  uniform float pitch;
+  uniform float fov;
+  uniform float aspect;
+  uniform float mirror;
+  varying vec2 vUv;
+
+  const float PI = 3.1415926535897932384626433832795;
+
+  vec3 rotateX(vec3 value, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec3(value.x, c * value.y - s * value.z, s * value.y + c * value.z);
+  }
+
+  vec3 rotateY(vec3 value, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec3(c * value.x + s * value.z, value.y, -s * value.x + c * value.z);
+  }
+
+  void main() {
+    vec2 screen = vUv * 2.0 - 1.0;
+    screen.x *= aspect;
+
+    float scale = tan(radians(fov) * 0.5);
+    vec3 direction = normalize(vec3(screen.x * scale, screen.y * scale, -1.0));
+    direction = rotateY(rotateX(direction, pitch), yaw);
+
+    float longitude = atan(direction.x, -direction.z);
+    float latitude = asin(clamp(direction.y, -1.0, 1.0));
+    float u = longitude / (2.0 * PI) + 0.5;
+    float v = 0.5 - latitude / PI;
+
+    if (mirror > 0.5) {
+      u = 1.0 - u;
+    }
+
+    gl_FragColor = texture2D(panorama, vec2(fract(u), clamp(v, 0.0, 1.0)));
+  }
+`;
+
+function shouldUseCorrection(
+  enabled: boolean,
+  lens: ReturnType<typeof getLensById>,
+  pose: CameraPose,
+) {
+  return enabled && ((lens.focalLength ?? 0) >= 50 || pose.dolly > 0.4);
+}
+
 export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function PanoViewer(
-  { imageUrl, lensId, pose, isMirrored, onPoseChange },
+  { imageUrl, lensId, pose, isMirrored, isDistortionCorrectionEnabled, onPoseChange },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const correctionCameraRef = useRef<OrthographicCamera | null>(null);
+  const correctionSceneRef = useRef<Scene | null>(null);
+  const correctionMaterialRef = useRef<ShaderMaterial | null>(null);
   const materialRef = useRef<MeshBasicMaterial | null>(null);
   const sphereRef = useRef<Mesh | null>(null);
+  const correctionPlaneRef = useRef<Mesh | null>(null);
   const frameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const latestPoseRef = useRef(pose);
   const latestLensRef = useRef(lensId);
   const latestMirrorRef = useRef(isMirrored);
+  const latestCorrectionRef = useRef(isDistortionCorrectionEnabled);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   latestPoseRef.current = pose;
   latestLensRef.current = lensId;
   latestMirrorRef.current = isMirrored;
+  latestCorrectionRef.current = isDistortionCorrectionEnabled;
 
   useImperativeHandle(ref, () => ({
     capture: () =>
@@ -94,7 +176,10 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     }
 
     const scene = new Scene();
+    const correctionScene = new Scene();
     const camera = new PerspectiveCamera(getLensById(lensId).fov, 16 / 9, 0.1, 1000);
+    const correctionCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 2);
+    correctionCamera.position.z = 1;
     const renderer = new WebGLRenderer({
       antialias: true,
       preserveDrawingBuffer: true,
@@ -110,18 +195,42 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     const sphere = new Mesh(geometry, material);
     sphere.scale.x = -1;
     scene.add(sphere);
+
+    const correctionUniforms: CorrectionUniforms = {
+      panorama: { value: null },
+      yaw: { value: 0 },
+      pitch: { value: 0 },
+      fov: { value: getLensById(lensId).fov },
+      aspect: { value: 16 / 9 },
+      mirror: { value: 0 },
+    };
+    const correctionMaterial = new ShaderMaterial({
+      uniforms: correctionUniforms,
+      vertexShader: correctionVertexShader,
+      fragmentShader: correctionFragmentShader,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const correctionPlane = new Mesh(new PlaneGeometry(2, 2), correctionMaterial);
+    correctionScene.add(correctionPlane);
+
     container.appendChild(renderer.domElement);
 
     cameraRef.current = camera;
+    correctionCameraRef.current = correctionCamera;
+    correctionSceneRef.current = correctionScene;
+    correctionMaterialRef.current = correctionMaterial;
     rendererRef.current = renderer;
     materialRef.current = material;
     sphereRef.current = sphere;
+    correctionPlaneRef.current = correctionPlane;
 
     const resize = () => {
       const width = container.clientWidth;
       const height = container.clientHeight;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      correctionUniforms.aspect.value = width / height;
       renderer.setSize(width, height, false);
     };
 
@@ -130,13 +239,23 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       const activeLens = getLensById(latestLensRef.current);
       const yaw = toRadians(activePose.yaw);
       const pitch = toRadians(activePose.pitch);
+      const effectiveFov = getEffectiveFov(activeLens.fov, activePose.dolly);
+      const useCorrection = shouldUseCorrection(latestCorrectionRef.current, activeLens, activePose);
 
       sphere.scale.x = latestMirrorRef.current ? 1 : -1;
-      camera.fov = getEffectiveFov(activeLens.fov, activePose.dolly);
-      camera.position.set(0, 0, 0);
-      camera.rotation.set(pitch, yaw, 0, 'YXZ');
-      camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
+      if (useCorrection && correctionUniforms.panorama.value) {
+        correctionUniforms.yaw.value = yaw;
+        correctionUniforms.pitch.value = pitch;
+        correctionUniforms.fov.value = effectiveFov;
+        correctionUniforms.mirror.value = latestMirrorRef.current ? 1 : 0;
+        renderer.render(correctionScene, correctionCamera);
+      } else {
+        camera.fov = effectiveFov;
+        camera.position.set(0, 0, 0);
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+      }
       frameRef.current = window.requestAnimationFrame(render);
     };
 
@@ -153,12 +272,18 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       material.map?.dispose();
       material.dispose();
       geometry.dispose();
+      correctionMaterial.dispose();
+      correctionPlane.geometry.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       cameraRef.current = null;
+      correctionCameraRef.current = null;
+      correctionSceneRef.current = null;
+      correctionMaterialRef.current = null;
       rendererRef.current = null;
       materialRef.current = null;
       sphereRef.current = null;
+      correctionPlaneRef.current = null;
     };
   }, []);
 
@@ -189,6 +314,10 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
         material.map?.dispose();
         material.map = texture;
         material.needsUpdate = true;
+        const correctionMaterial = correctionMaterialRef.current;
+        if (correctionMaterial) {
+          (correctionMaterial.uniforms as CorrectionUniforms).panorama.value = texture;
+        }
         setIsLoading(false);
       },
       undefined,
