@@ -60,6 +60,8 @@ type DragState = {
 
 type CorrectionUniforms = {
   renderedFrame: { value: Texture | null };
+  fov: { value: number };
+  aspect: { value: number };
   correctionStrength: { value: number };
 };
 
@@ -76,14 +78,18 @@ const correctionFragmentShader = `
   precision highp float;
 
   uniform sampler2D renderedFrame;
+  uniform float fov;
+  uniform float aspect;
   uniform float correctionStrength;
   varying vec2 vUv;
 
   void main() {
     vec2 centered = vUv * 2.0 - 1.0;
-    float radiusSquared = dot(centered, centered);
-    float edgeCrop = 1.0 - correctionStrength * radiusSquared;
-    vec2 sampleUv = centered * edgeCrop * 0.5 + 0.5;
+    float verticalHalfFov = radians(fov) * 0.5;
+    float horizontalHalfFov = atan(tan(verticalHalfFov) * aspect);
+    float cylindricalX = tan(centered.x * horizontalHalfFov) / tan(horizontalHalfFov);
+    vec2 cylindricalUv = vec2(cylindricalX, centered.y) * 0.5 + 0.5;
+    vec2 sampleUv = mix(vUv, cylindricalUv, correctionStrength);
 
     gl_FragColor = texture2D(renderedFrame, sampleUv);
     #include <colorspace_fragment>
@@ -99,10 +105,10 @@ function shouldUseCorrection(
 }
 
 function getCorrectionStrength(lens: ReturnType<typeof getLensById>, pose: CameraPose, fov: number) {
-  const focalBoost = (lens.focalLength ?? 0) >= 50 ? 0.006 : 0;
-  const zoomOutBoost = pose.dolly < 0 ? Math.min(0.012, Math.abs(pose.dolly) * 0.006) : 0;
-  const wideFovBoost = Math.min(0.02, Math.max(0, (fov - 35) / 75) * 0.02);
-  return Math.min(0.035, focalBoost + zoomOutBoost + wideFovBoost);
+  const focalBoost = (lens.focalLength ?? 0) >= 50 ? 0.1 : 0;
+  const zoomOutBoost = pose.dolly < 0 ? Math.min(0.1, Math.abs(pose.dolly) * 0.05) : 0;
+  const wideFovBoost = Math.min(0.16, Math.max(0, (fov - 35) / 75) * 0.16);
+  return Math.min(0.36, focalBoost + zoomOutBoost + wideFovBoost);
 }
 
 export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function PanoViewer(
@@ -180,6 +186,8 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     correctionTarget.texture.colorSpace = SRGBColorSpace;
     const correctionUniforms: CorrectionUniforms = {
       renderedFrame: { value: correctionTarget.texture },
+      fov: { value: getLensById(lensId).fov },
+      aspect: { value: 16 / 9 },
       correctionStrength: { value: 0 },
     };
     const correctionMaterial = new ShaderMaterial({
@@ -209,6 +217,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       const height = container.clientHeight;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      correctionUniforms.aspect.value = width / height;
       correctionTarget.setSize(width, height);
       renderer.setSize(width, height, false);
     };
@@ -228,6 +237,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       camera.updateProjectionMatrix();
 
       if (useCorrection) {
+        correctionUniforms.fov.value = effectiveFov;
         correctionUniforms.correctionStrength.value = getCorrectionStrength(
           activeLens,
           activePose,
