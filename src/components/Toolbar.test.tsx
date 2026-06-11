@@ -16,7 +16,9 @@ function renderToolbar(overrides = {}) {
     onDistortionCorrectionAmountChange: vi.fn(),
     onCameraAction: vi.fn(),
     onFileSelected: vi.fn(),
+    onGenerateCubemap: vi.fn(),
     onCapture: vi.fn(),
+    isGeneratingCubemap: false,
     isCapturing: false,
     ...overrides,
   };
@@ -58,6 +60,15 @@ describe('Toolbar', () => {
     await user.click(screen.getByRole('button', { name: /拍照/ }));
 
     expect(props.onCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits cubemap generation action', async () => {
+    const user = userEvent.setup();
+    const props = renderToolbar();
+
+    await user.click(screen.getByRole('button', { name: '生成map' }));
+
+    expect(props.onGenerateCubemap).toHaveBeenCalledTimes(1);
   });
 
   it('emits mirror toggle action', async () => {

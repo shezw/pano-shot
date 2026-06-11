@@ -18,6 +18,7 @@ import {
   IconCamera,
   IconChevronLeft,
   IconChevronRight,
+  IconCube,
   IconFlipHorizontal,
   IconRotateClockwise2,
   IconUpload,
@@ -38,7 +39,9 @@ type ToolbarProps = {
   onDistortionCorrectionAmountChange: (amount: number) => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
+  onGenerateCubemap: () => void;
   onCapture: () => void;
+  isGeneratingCubemap: boolean;
   isCapturing: boolean;
 };
 
@@ -67,7 +70,9 @@ export function Toolbar({
   onDistortionCorrectionAmountChange,
   onCameraAction,
   onFileSelected,
+  onGenerateCubemap,
   onCapture,
+  isGeneratingCubemap,
   isCapturing,
 }: ToolbarProps) {
   return (
@@ -86,6 +91,17 @@ export function Toolbar({
             </Button>
           )}
         </FileButton>
+
+        <Button
+          className="toolbar-button"
+          leftSection={<IconCube size={16} />}
+          variant="light"
+          color="gray"
+          onClick={onGenerateCubemap}
+          loading={isGeneratingCubemap}
+        >
+          生成map
+        </Button>
 
         <Tooltip label="镜像" openDelay={250}>
           <ActionIcon

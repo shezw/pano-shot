@@ -148,6 +148,56 @@ select {
   padding-inline: 2px;
 }
 
+.cubemap-error {
+  width: min(100%, calc((100vh - 128px) * 16 / 9));
+  max-width: 100%;
+  margin: 10px auto 0;
+}
+
+.cubemap-preview {
+  width: min(100%, calc((100vh - 128px) * 16 / 9));
+  max-width: 100%;
+  margin: 14px auto 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(88px, 1fr));
+  gap: 10px;
+}
+
+.cubemap-tile {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.cubemap-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #050505;
+}
+
+.cubemap-tile:hover img {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.cubemap-label {
+  text-align: center;
+}
+
+.cubemap-modal-image {
+  display: block;
+  width: min(100%, 72vh);
+  margin: 0 auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
 @media (max-width: 760px) {
   .toolbar-row {
     padding-inline: 10px;
@@ -160,5 +210,9 @@ select {
   .preview-shell {
     min-height: calc(100vh - 60px);
     padding-inline: 10px;
+  }
+
+  .cubemap-preview {
+    grid-template-columns: repeat(3, minmax(72px, 1fr));
   }
 }

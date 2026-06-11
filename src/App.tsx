@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Group, Text } from '@mantine/core';
+import { CubemapPreview } from './components/CubemapPreview';
 import { PanoViewer, type PanoViewerHandle } from './components/PanoViewer';
 import { Toolbar } from './components/Toolbar';
 import { applyCameraAction, DEFAULT_CAMERA_POSE, type CameraPose } from './lib/camera';
+import { generateCubemapFaces, type CubemapFace } from './lib/cubemap';
 import { buildShotFilename, type LensId } from './lib/lens';
 
 const defaultPanoramaUrl = new URL('../assets/prono-0610-1534.png', import.meta.url).href;
@@ -13,6 +15,9 @@ export function App() {
   const [pose, setPose] = useState<CameraPose>(DEFAULT_CAMERA_POSE);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isGeneratingCubemap, setIsGeneratingCubemap] = useState(false);
+  const [cubemapFaces, setCubemapFaces] = useState<CubemapFace[]>([]);
+  const [cubemapError, setCubemapError] = useState<string | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
   const [isDistortionCorrectionEnabled, setIsDistortionCorrectionEnabled] = useState(true);
   const [distortionCorrectionAmount, setDistortionCorrectionAmount] = useState(100);
@@ -39,12 +44,27 @@ export function App() {
       return;
     }
 
+    setCubemapFaces([]);
+    setCubemapError(null);
     setUploadedUrl((currentUrl) => {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
       }
       return URL.createObjectURL(file);
     });
+  };
+
+  const handleGenerateCubemap = async () => {
+    setIsGeneratingCubemap(true);
+    setCubemapError(null);
+    try {
+      const faces = await generateCubemapFaces(imageUrl);
+      setCubemapFaces(faces);
+    } catch {
+      setCubemapError('Cubemap 生成失败');
+    } finally {
+      setIsGeneratingCubemap(false);
+    }
   };
 
   const handleCapture = async () => {
@@ -81,7 +101,9 @@ export function App() {
         onDistortionCorrectionAmountChange={setDistortionCorrectionAmount}
         onCameraAction={(action) => setPose((currentPose) => applyCameraAction(currentPose, action))}
         onFileSelected={handleFileSelected}
+        onGenerateCubemap={handleGenerateCubemap}
         onCapture={handleCapture}
+        isGeneratingCubemap={isGeneratingCubemap}
         isCapturing={isCapturing}
       />
 
@@ -106,6 +128,12 @@ export function App() {
             16:9
           </Text>
         </Group>
+        {cubemapError && (
+          <Text className="cubemap-error" size="sm" c="red">
+            {cubemapError}
+          </Text>
+        )}
+        <CubemapPreview faces={cubemapFaces} />
       </main>
     </Box>
   );
