@@ -11,12 +11,14 @@ function renderToolbar(overrides = {}) {
     isDistortionCorrectionEnabled: true,
     distortionCorrectionAmount: 100,
     isDepthDollyEnabled: false,
+    depthDollyStrength: 60,
     hasDepthMap: false,
     onLensChange: vi.fn(),
     onToggleMirror: vi.fn(),
     onDistortionCorrectionChange: vi.fn(),
     onDistortionCorrectionAmountChange: vi.fn(),
     onDepthDollyChange: vi.fn(),
+    onDepthDollyStrengthChange: vi.fn(),
     onDepthFileSelected: vi.fn(),
     onCameraAction: vi.fn(),
     onFileSelected: vi.fn(),
@@ -86,7 +88,7 @@ describe('Toolbar', () => {
     const user = userEvent.setup();
     const props = renderToolbar();
 
-    const slider = screen.getByRole('slider');
+    const [slider] = screen.getAllByRole('slider');
     expect(slider).toHaveAttribute('aria-valuemin', '-50');
     expect(slider).toHaveAttribute('aria-valuemax', '150');
     await user.click(slider);
@@ -97,10 +99,34 @@ describe('Toolbar', () => {
 
   it('emits depth dolly switch changes', async () => {
     const user = userEvent.setup();
-    const props = renderToolbar();
+    const props = renderToolbar({ hasDepthMap: true });
 
     await user.click(screen.getByRole('switch', { name: '深度后退' }));
 
     expect(props.onDepthDollyChange).toHaveBeenCalledWith(true);
+  });
+
+  it('disables depth dolly controls until a depth map is loaded', () => {
+    renderToolbar();
+
+    expect(screen.getByRole('switch', { name: '深度后退' })).toBeDisabled();
+    expect(screen.getAllByRole('slider')[1]).toHaveAttribute('data-disabled', 'true');
+    expect(screen.getByText('无')).toBeInTheDocument();
+  });
+
+  it('emits depth strength changes when depth dolly is active', async () => {
+    const user = userEvent.setup();
+    const props = renderToolbar({
+      hasDepthMap: true,
+      isDepthDollyEnabled: true,
+    });
+
+    const slider = screen.getAllByRole('slider')[1];
+    expect(slider).toHaveAttribute('aria-valuemin', '0');
+    expect(slider).toHaveAttribute('aria-valuemax', '150');
+    await user.click(slider);
+    await user.keyboard('{ArrowRight}');
+
+    expect(props.onDepthDollyStrengthChange).toHaveBeenCalled();
   });
 });

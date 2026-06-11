@@ -74,12 +74,20 @@ select {
   padding-inline: 2px 8px;
 }
 
-.distortion-control .mantine-Slider-root {
+.depth-control {
+  flex: 0 0 auto;
+  width: 150px;
+  padding-inline: 2px 8px;
+}
+
+.distortion-control .mantine-Slider-root,
+.depth-control .mantine-Slider-root {
   flex: 1 1 auto;
   min-width: 96px;
 }
 
-.distortion-value {
+.distortion-value,
+.depth-value {
   width: 38px;
   text-align: right;
   font-variant-numeric: tabular-nums;

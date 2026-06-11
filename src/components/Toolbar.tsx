@@ -34,12 +34,14 @@ type ToolbarProps = {
   isDistortionCorrectionEnabled: boolean;
   distortionCorrectionAmount: number;
   isDepthDollyEnabled: boolean;
+  depthDollyStrength: number;
   hasDepthMap: boolean;
   onLensChange: (lensId: LensId) => void;
   onToggleMirror: () => void;
   onDistortionCorrectionChange: (enabled: boolean) => void;
   onDistortionCorrectionAmountChange: (amount: number) => void;
   onDepthDollyChange: (enabled: boolean) => void;
+  onDepthDollyStrengthChange: (amount: number) => void;
   onDepthFileSelected: (file: File | null) => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
@@ -67,12 +69,14 @@ export function Toolbar({
   isDistortionCorrectionEnabled,
   distortionCorrectionAmount,
   isDepthDollyEnabled,
+  depthDollyStrength,
   hasDepthMap,
   onLensChange,
   onToggleMirror,
   onDistortionCorrectionChange,
   onDistortionCorrectionAmountChange,
   onDepthDollyChange,
+  onDepthDollyStrengthChange,
   onDepthFileSelected,
   onCameraAction,
   onFileSelected,
@@ -141,9 +145,29 @@ export function Toolbar({
           aria-label="深度后退"
           label="深度后退"
           checked={isDepthDollyEnabled}
+          disabled={!hasDepthMap}
           onChange={(event) => onDepthDollyChange(event.currentTarget.checked)}
           size="sm"
         />
+
+        <Group className="depth-control" gap={8} wrap="nowrap">
+          <Slider
+            aria-label="深度强度"
+            value={depthDollyStrength}
+            onChange={onDepthDollyStrengthChange}
+            min={0}
+            max={150}
+            step={5}
+            disabled={!hasDepthMap || !isDepthDollyEnabled}
+            size="xs"
+            color="teal"
+            label={(value) => `${value}%`}
+            thumbProps={{ 'aria-label': '深度强度' }}
+          />
+          <Text className="depth-value" size="xs" c="dimmed" aria-live="polite">
+            {hasDepthMap ? `${depthDollyStrength}%` : '无'}
+          </Text>
+        </Group>
 
         <FileButton onChange={onDepthFileSelected} accept="image/png,image/jpeg,image/webp">
           {(props) => (

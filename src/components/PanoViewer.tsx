@@ -45,6 +45,7 @@ type PanoViewerProps = {
   isDistortionCorrectionEnabled: boolean;
   distortionCorrectionAmount: number;
   isDepthDollyEnabled: boolean;
+  depthDollyStrength: number;
   depthMapUrl: string | null;
   onPoseChange: (pose: CameraPose) => void;
 };
@@ -78,7 +79,7 @@ type DepthSample = {
 };
 
 const DEPTH_DOLLY_SCALE = 72;
-const DEPTH_PROXY_STRENGTH = 0.42;
+const MAX_DEPTH_PROXY_STRENGTH = 0.42;
 
 const correctionVertexShader = `
   varying vec2 vUv;
@@ -126,15 +127,6 @@ function getCorrectionStrength(lens: ReturnType<typeof getLensById>, pose: Camer
   return Math.min(0.36, focalBoost + zoomOutBoost + wideFovBoost);
 }
 
-function getFallbackDepth(u: number, v: number) {
-  const verticalDistance = Math.abs(v - 0.5) * 2;
-  const horizonDepth = 1.18;
-  const floorCeilingDepth = 0.82;
-  const verticalDepth = horizonDepth + (floorCeilingDepth - horizonDepth) * verticalDistance;
-  const wallVariation = Math.sin(u * Math.PI * 8) * 0.04;
-  return verticalDepth + wallVariation;
-}
-
 function getDepthMapValue(depthSample: DepthSample, u: number, v: number) {
   const x = Math.min(depthSample.width - 1, Math.max(0, Math.round(u * (depthSample.width - 1))));
   const y = Math.min(depthSample.height - 1, Math.max(0, Math.round(v * (depthSample.height - 1))));
@@ -145,10 +137,12 @@ function getDepthMapValue(depthSample: DepthSample, u: number, v: number) {
 function applyDepthProxy(
   geometry: SphereGeometry,
   basePositions: Float32Array,
-  depthSample: DepthSample | null,
+  depthSample: DepthSample,
+  strength: number,
 ) {
   const position = geometry.attributes.position as BufferAttribute;
   const uv = geometry.attributes.uv as BufferAttribute;
+  const proxyStrength = MAX_DEPTH_PROXY_STRENGTH * strength;
 
   for (let index = 0; index < position.count; index += 1) {
     const x = basePositions[index * 3];
@@ -157,13 +151,26 @@ function applyDepthProxy(
     const radius = Math.hypot(x, y, z);
     const u = uv.getX(index);
     const v = uv.getY(index);
-    const depth = depthSample
-      ? 0.68 + getDepthMapValue(depthSample, u, v) * 0.72
-      : getFallbackDepth(u, v);
-    const scaledRadius = radius * (1 + (depth - 1) * DEPTH_PROXY_STRENGTH);
+    const depth = 0.68 + getDepthMapValue(depthSample, u, v) * 0.72;
+    const scaledRadius = radius * (1 + (depth - 1) * proxyStrength);
     const scale = scaledRadius / radius;
 
     position.setXYZ(index, x * scale, y * scale, z * scale);
+  }
+
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function resetDepthProxy(geometry: SphereGeometry, basePositions: Float32Array) {
+  const position = geometry.attributes.position as BufferAttribute;
+  for (let index = 0; index < position.count; index += 1) {
+    position.setXYZ(
+      index,
+      basePositions[index * 3],
+      basePositions[index * 3 + 1],
+      basePositions[index * 3 + 2],
+    );
   }
 
   position.needsUpdate = true;
@@ -202,6 +209,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     isDistortionCorrectionEnabled,
     distortionCorrectionAmount,
     isDepthDollyEnabled,
+    depthDollyStrength,
     depthMapUrl,
     onPoseChange,
   },
@@ -229,6 +237,8 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   const latestCorrectionRef = useRef(isDistortionCorrectionEnabled);
   const latestCorrectionAmountRef = useRef(distortionCorrectionAmount);
   const latestDepthDollyRef = useRef(isDepthDollyEnabled);
+  const latestDepthDollyStrengthRef = useRef(depthDollyStrength);
+  const latestHasDepthMapRef = useRef(Boolean(depthMapUrl));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -238,6 +248,8 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   latestCorrectionRef.current = isDistortionCorrectionEnabled;
   latestCorrectionAmountRef.current = distortionCorrectionAmount;
   latestDepthDollyRef.current = isDepthDollyEnabled;
+  latestDepthDollyStrengthRef.current = depthDollyStrength;
+  latestHasDepthMapRef.current = Boolean(depthMapUrl);
 
   useImperativeHandle(ref, () => ({
     capture: () =>
@@ -288,7 +300,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     const baseDepthPositions = new Float32Array(
       (depthGeometry.attributes.position as BufferAttribute).array,
     );
-    applyDepthProxy(depthGeometry, baseDepthPositions, null);
+    resetDepthProxy(depthGeometry, baseDepthPositions);
 
     const correctionTarget = new WebGLRenderTarget(1, 1, {
       minFilter: LinearFilter,
@@ -342,7 +354,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       const activeLens = getLensById(latestLensRef.current);
       const yaw = toRadians(activePose.yaw);
       const pitch = toRadians(activePose.pitch);
-      const useDepthDolly = latestDepthDollyRef.current;
+      const useDepthDolly = latestDepthDollyRef.current && latestHasDepthMapRef.current;
       const effectiveFov = useDepthDolly
         ? activeLens.fov
         : getEffectiveFov(activeLens.fov, activePose.dolly);
@@ -359,7 +371,10 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       if (useDepthDolly) {
         const forward = new Vector3(0, 0, -1).applyEuler(new Euler(pitch, yaw, 0, 'YXZ'));
-        camera.position.copy(forward.multiplyScalar(activePose.dolly * DEPTH_DOLLY_SCALE));
+        const depthStrength = latestDepthDollyStrengthRef.current / 100;
+        camera.position.copy(
+          forward.multiplyScalar(activePose.dolly * DEPTH_DOLLY_SCALE * depthStrength),
+        );
       } else {
         camera.position.set(0, 0, 0);
       }
@@ -472,26 +487,31 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     let cancelled = false;
 
     if (!depthMapUrl) {
-      applyDepthProxy(depthGeometry, baseDepthPositions, null);
+      resetDepthProxy(depthGeometry, baseDepthPositions);
       return undefined;
     }
 
     loadDepthSample(depthMapUrl)
       .then((depthSample) => {
         if (!cancelled) {
-          applyDepthProxy(depthGeometry, baseDepthPositions, depthSample);
+          applyDepthProxy(
+            depthGeometry,
+            baseDepthPositions,
+            depthSample,
+            depthDollyStrength / 100,
+          );
         }
       })
       .catch(() => {
         if (!cancelled) {
-          applyDepthProxy(depthGeometry, baseDepthPositions, null);
+          resetDepthProxy(depthGeometry, baseDepthPositions);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [depthMapUrl]);
+  }, [depthMapUrl, depthDollyStrength]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {

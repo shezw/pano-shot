@@ -17,6 +17,7 @@ export function App() {
   const [isDistortionCorrectionEnabled, setIsDistortionCorrectionEnabled] = useState(true);
   const [distortionCorrectionAmount, setDistortionCorrectionAmount] = useState(100);
   const [isDepthDollyEnabled, setIsDepthDollyEnabled] = useState(false);
+  const [depthDollyStrength, setDepthDollyStrength] = useState(60);
   const [depthMapUrl, setDepthMapUrl] = useState<string | null>(null);
 
   const imageUrl = uploadedUrl ?? defaultPanoramaUrl;
@@ -53,6 +54,7 @@ export function App() {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
       }
+      setIsDepthDollyEnabled(true);
       return URL.createObjectURL(file);
     });
   };
@@ -99,12 +101,14 @@ export function App() {
         isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
         distortionCorrectionAmount={distortionCorrectionAmount}
         isDepthDollyEnabled={isDepthDollyEnabled}
+        depthDollyStrength={depthDollyStrength}
         hasDepthMap={Boolean(depthMapUrl)}
         onLensChange={setLensId}
         onToggleMirror={() => setIsMirrored((currentValue) => !currentValue)}
         onDistortionCorrectionChange={setIsDistortionCorrectionEnabled}
         onDistortionCorrectionAmountChange={setDistortionCorrectionAmount}
         onDepthDollyChange={setIsDepthDollyEnabled}
+        onDepthDollyStrengthChange={setDepthDollyStrength}
         onDepthFileSelected={handleDepthFileSelected}
         onCameraAction={(action) => setPose((currentPose) => applyCameraAction(currentPose, action))}
         onFileSelected={handleFileSelected}
@@ -123,6 +127,7 @@ export function App() {
             isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
             distortionCorrectionAmount={distortionCorrectionAmount}
             isDepthDollyEnabled={isDepthDollyEnabled}
+            depthDollyStrength={depthDollyStrength}
             depthMapUrl={depthMapUrl}
             onPoseChange={setPose}
           />
