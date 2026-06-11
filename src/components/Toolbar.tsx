@@ -19,6 +19,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconFlipHorizontal,
+  IconLayersSubtract,
   IconRotateClockwise2,
   IconUpload,
   IconZoomIn,
@@ -32,10 +33,14 @@ type ToolbarProps = {
   isMirrored: boolean;
   isDistortionCorrectionEnabled: boolean;
   distortionCorrectionAmount: number;
+  isDepthDollyEnabled: boolean;
+  hasDepthMap: boolean;
   onLensChange: (lensId: LensId) => void;
   onToggleMirror: () => void;
   onDistortionCorrectionChange: (enabled: boolean) => void;
   onDistortionCorrectionAmountChange: (amount: number) => void;
+  onDepthDollyChange: (enabled: boolean) => void;
+  onDepthFileSelected: (file: File | null) => void;
   onCameraAction: (action: CameraAction) => void;
   onFileSelected: (file: File | null) => void;
   onCapture: () => void;
@@ -61,10 +66,14 @@ export function Toolbar({
   isMirrored,
   isDistortionCorrectionEnabled,
   distortionCorrectionAmount,
+  isDepthDollyEnabled,
+  hasDepthMap,
   onLensChange,
   onToggleMirror,
   onDistortionCorrectionChange,
   onDistortionCorrectionAmountChange,
+  onDepthDollyChange,
+  onDepthFileSelected,
   onCameraAction,
   onFileSelected,
   onCapture,
@@ -126,6 +135,34 @@ export function Toolbar({
             {distortionCorrectionAmount}%
           </Text>
         </Group>
+
+        <Switch
+          className="toolbar-switch depth-switch"
+          aria-label="深度后退"
+          label="深度后退"
+          checked={isDepthDollyEnabled}
+          onChange={(event) => onDepthDollyChange(event.currentTarget.checked)}
+          size="sm"
+        />
+
+        <FileButton onChange={onDepthFileSelected} accept="image/png,image/jpeg,image/webp">
+          {(props) => (
+            <Tooltip
+              label={hasDepthMap ? '已加载深度图' : '选择深度图'}
+              openDelay={250}
+            >
+              <ActionIcon
+                {...props}
+                aria-label="选择深度图"
+                variant={hasDepthMap ? 'filled' : 'subtle'}
+                color={hasDepthMap ? 'blue' : 'gray'}
+                size="lg"
+              >
+                <IconLayersSubtract size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </FileButton>
 
         <SegmentedControl
           aria-label="镜头选择"

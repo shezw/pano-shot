@@ -16,6 +16,8 @@ export function App() {
   const [isMirrored, setIsMirrored] = useState(false);
   const [isDistortionCorrectionEnabled, setIsDistortionCorrectionEnabled] = useState(true);
   const [distortionCorrectionAmount, setDistortionCorrectionAmount] = useState(100);
+  const [isDepthDollyEnabled, setIsDepthDollyEnabled] = useState(false);
+  const [depthMapUrl, setDepthMapUrl] = useState<string | null>(null);
 
   const imageUrl = uploadedUrl ?? defaultPanoramaUrl;
 
@@ -26,6 +28,14 @@ export function App() {
       }
     };
   }, [uploadedUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (depthMapUrl) {
+        URL.revokeObjectURL(depthMapUrl);
+      }
+    };
+  }, [depthMapUrl]);
 
   const cameraMeta = useMemo(() => {
     const yaw = Math.round(pose.yaw);
@@ -40,6 +50,19 @@ export function App() {
     }
 
     setUploadedUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const handleDepthFileSelected = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setDepthMapUrl((currentUrl) => {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
       }
@@ -75,10 +98,14 @@ export function App() {
         isMirrored={isMirrored}
         isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
         distortionCorrectionAmount={distortionCorrectionAmount}
+        isDepthDollyEnabled={isDepthDollyEnabled}
+        hasDepthMap={Boolean(depthMapUrl)}
         onLensChange={setLensId}
         onToggleMirror={() => setIsMirrored((currentValue) => !currentValue)}
         onDistortionCorrectionChange={setIsDistortionCorrectionEnabled}
         onDistortionCorrectionAmountChange={setDistortionCorrectionAmount}
+        onDepthDollyChange={setIsDepthDollyEnabled}
+        onDepthFileSelected={handleDepthFileSelected}
         onCameraAction={(action) => setPose((currentPose) => applyCameraAction(currentPose, action))}
         onFileSelected={handleFileSelected}
         onCapture={handleCapture}
@@ -95,6 +122,8 @@ export function App() {
             isMirrored={isMirrored}
             isDistortionCorrectionEnabled={isDistortionCorrectionEnabled}
             distortionCorrectionAmount={distortionCorrectionAmount}
+            isDepthDollyEnabled={isDepthDollyEnabled}
+            depthMapUrl={depthMapUrl}
             onPoseChange={setPose}
           />
         </section>

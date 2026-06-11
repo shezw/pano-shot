@@ -10,10 +10,14 @@ function renderToolbar(overrides = {}) {
     isMirrored: false,
     isDistortionCorrectionEnabled: true,
     distortionCorrectionAmount: 100,
+    isDepthDollyEnabled: false,
+    hasDepthMap: false,
     onLensChange: vi.fn(),
     onToggleMirror: vi.fn(),
     onDistortionCorrectionChange: vi.fn(),
     onDistortionCorrectionAmountChange: vi.fn(),
+    onDepthDollyChange: vi.fn(),
+    onDepthFileSelected: vi.fn(),
     onCameraAction: vi.fn(),
     onFileSelected: vi.fn(),
     onCapture: vi.fn(),
@@ -89,5 +93,14 @@ describe('Toolbar', () => {
     await user.keyboard('{ArrowRight}');
 
     expect(props.onDistortionCorrectionAmountChange).toHaveBeenCalled();
+  });
+
+  it('emits depth dolly switch changes', async () => {
+    const user = userEvent.setup();
+    const props = renderToolbar();
+
+    await user.click(screen.getByRole('switch', { name: '深度后退' }));
+
+    expect(props.onDepthDollyChange).toHaveBeenCalledWith(true);
   });
 });

@@ -24,6 +24,9 @@ import {
   TextureLoader,
   WebGLRenderer,
   WebGLRenderTarget,
+  Euler,
+  Vector3,
+  BufferAttribute,
 } from 'three';
 import { getLensById, type LensId } from '../lib/lens';
 import {
@@ -41,6 +44,8 @@ type PanoViewerProps = {
   isMirrored: boolean;
   isDistortionCorrectionEnabled: boolean;
   distortionCorrectionAmount: number;
+  isDepthDollyEnabled: boolean;
+  depthMapUrl: string | null;
   onPoseChange: (pose: CameraPose) => void;
 };
 
@@ -65,6 +70,15 @@ type CorrectionUniforms = {
   aspect: { value: number };
   correctionStrength: { value: number };
 };
+
+type DepthSample = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+};
+
+const DEPTH_DOLLY_SCALE = 72;
+const DEPTH_PROXY_STRENGTH = 0.42;
 
 const correctionVertexShader = `
   varying vec2 vUv;
@@ -112,6 +126,73 @@ function getCorrectionStrength(lens: ReturnType<typeof getLensById>, pose: Camer
   return Math.min(0.36, focalBoost + zoomOutBoost + wideFovBoost);
 }
 
+function getFallbackDepth(u: number, v: number) {
+  const verticalDistance = Math.abs(v - 0.5) * 2;
+  const horizonDepth = 1.18;
+  const floorCeilingDepth = 0.82;
+  const verticalDepth = horizonDepth + (floorCeilingDepth - horizonDepth) * verticalDistance;
+  const wallVariation = Math.sin(u * Math.PI * 8) * 0.04;
+  return verticalDepth + wallVariation;
+}
+
+function getDepthMapValue(depthSample: DepthSample, u: number, v: number) {
+  const x = Math.min(depthSample.width - 1, Math.max(0, Math.round(u * (depthSample.width - 1))));
+  const y = Math.min(depthSample.height - 1, Math.max(0, Math.round(v * (depthSample.height - 1))));
+  const index = (y * depthSample.width + x) * 4;
+  return depthSample.data[index] / 255;
+}
+
+function applyDepthProxy(
+  geometry: SphereGeometry,
+  basePositions: Float32Array,
+  depthSample: DepthSample | null,
+) {
+  const position = geometry.attributes.position as BufferAttribute;
+  const uv = geometry.attributes.uv as BufferAttribute;
+
+  for (let index = 0; index < position.count; index += 1) {
+    const x = basePositions[index * 3];
+    const y = basePositions[index * 3 + 1];
+    const z = basePositions[index * 3 + 2];
+    const radius = Math.hypot(x, y, z);
+    const u = uv.getX(index);
+    const v = uv.getY(index);
+    const depth = depthSample
+      ? 0.68 + getDepthMapValue(depthSample, u, v) * 0.72
+      : getFallbackDepth(u, v);
+    const scaledRadius = radius * (1 + (depth - 1) * DEPTH_PROXY_STRENGTH);
+    const scale = scaledRadius / radius;
+
+    position.setXYZ(index, x * scale, y * scale, z * scale);
+  }
+
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function loadDepthSample(depthMapUrl: string) {
+  return new Promise<DepthSample>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        reject(new Error('无法读取深度图'));
+        return;
+      }
+
+      context.drawImage(image, 0, 0);
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      resolve({ width: canvas.width, height: canvas.height, data: imageData.data });
+    };
+    image.onerror = () => reject(new Error('深度图加载失败'));
+    image.src = depthMapUrl;
+  });
+}
+
 export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function PanoViewer(
   {
     imageUrl,
@@ -120,6 +201,8 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     isMirrored,
     isDistortionCorrectionEnabled,
     distortionCorrectionAmount,
+    isDepthDollyEnabled,
+    depthMapUrl,
     onPoseChange,
   },
   ref,
@@ -132,7 +215,11 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   const correctionMaterialRef = useRef<ShaderMaterial | null>(null);
   const correctionTargetRef = useRef<WebGLRenderTarget | null>(null);
   const materialRef = useRef<MeshBasicMaterial | null>(null);
+  const depthMaterialRef = useRef<MeshBasicMaterial | null>(null);
   const sphereRef = useRef<Mesh | null>(null);
+  const depthSphereRef = useRef<Mesh | null>(null);
+  const depthGeometryRef = useRef<SphereGeometry | null>(null);
+  const baseDepthPositionsRef = useRef<Float32Array | null>(null);
   const correctionPlaneRef = useRef<Mesh | null>(null);
   const frameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -141,6 +228,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   const latestMirrorRef = useRef(isMirrored);
   const latestCorrectionRef = useRef(isDistortionCorrectionEnabled);
   const latestCorrectionAmountRef = useRef(distortionCorrectionAmount);
+  const latestDepthDollyRef = useRef(isDepthDollyEnabled);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,6 +237,7 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
   latestMirrorRef.current = isMirrored;
   latestCorrectionRef.current = isDistortionCorrectionEnabled;
   latestCorrectionAmountRef.current = distortionCorrectionAmount;
+  latestDepthDollyRef.current = isDepthDollyEnabled;
 
   useImperativeHandle(ref, () => ({
     capture: () =>
@@ -185,10 +274,21 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     const geometry = new SphereGeometry(500, 80, 48);
+    const depthGeometry = new SphereGeometry(500, 160, 96);
     const material = new MeshBasicMaterial({ side: BackSide });
+    const depthMaterial = new MeshBasicMaterial({ side: BackSide });
     const sphere = new Mesh(geometry, material);
+    const depthSphere = new Mesh(depthGeometry, depthMaterial);
     sphere.scale.x = -1;
+    depthSphere.scale.x = -1;
+    depthSphere.visible = false;
     scene.add(sphere);
+    scene.add(depthSphere);
+
+    const baseDepthPositions = new Float32Array(
+      (depthGeometry.attributes.position as BufferAttribute).array,
+    );
+    applyDepthProxy(depthGeometry, baseDepthPositions, null);
 
     const correctionTarget = new WebGLRenderTarget(1, 1, {
       minFilter: LinearFilter,
@@ -220,7 +320,11 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
     correctionTargetRef.current = correctionTarget;
     rendererRef.current = renderer;
     materialRef.current = material;
+    depthMaterialRef.current = depthMaterial;
     sphereRef.current = sphere;
+    depthSphereRef.current = depthSphere;
+    depthGeometryRef.current = depthGeometry;
+    baseDepthPositionsRef.current = baseDepthPositions;
     correctionPlaneRef.current = correctionPlane;
 
     const resize = () => {
@@ -238,16 +342,27 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       const activeLens = getLensById(latestLensRef.current);
       const yaw = toRadians(activePose.yaw);
       const pitch = toRadians(activePose.pitch);
-      const effectiveFov = getEffectiveFov(activeLens.fov, activePose.dolly);
+      const useDepthDolly = latestDepthDollyRef.current;
+      const effectiveFov = useDepthDolly
+        ? activeLens.fov
+        : getEffectiveFov(activeLens.fov, activePose.dolly);
       const correctionAmount = latestCorrectionAmountRef.current / 100;
       const useCorrection =
         correctionAmount !== 0 &&
         shouldUseCorrection(latestCorrectionRef.current, activeLens, activePose);
 
       sphere.scale.x = latestMirrorRef.current ? 1 : -1;
+      depthSphere.scale.x = latestMirrorRef.current ? 1 : -1;
+      sphere.visible = !useDepthDolly;
+      depthSphere.visible = useDepthDolly;
       camera.fov = effectiveFov;
-      camera.position.set(0, 0, 0);
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
+      if (useDepthDolly) {
+        const forward = new Vector3(0, 0, -1).applyEuler(new Euler(pitch, yaw, 0, 'YXZ'));
+        camera.position.copy(forward.multiplyScalar(activePose.dolly * DEPTH_DOLLY_SCALE));
+      } else {
+        camera.position.set(0, 0, 0);
+      }
       camera.updateProjectionMatrix();
 
       if (useCorrection) {
@@ -276,7 +391,9 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       observer.disconnect();
       material.map?.dispose();
       material.dispose();
+      depthMaterial.dispose();
       geometry.dispose();
+      depthGeometry.dispose();
       correctionMaterial.dispose();
       correctionTarget.dispose();
       correctionPlane.geometry.dispose();
@@ -289,14 +406,19 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       correctionTargetRef.current = null;
       rendererRef.current = null;
       materialRef.current = null;
+      depthMaterialRef.current = null;
       sphereRef.current = null;
+      depthSphereRef.current = null;
+      depthGeometryRef.current = null;
+      baseDepthPositionsRef.current = null;
       correctionPlaneRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const material = materialRef.current;
-    if (!material) {
+    const depthMaterial = depthMaterialRef.current;
+    if (!material || !depthMaterial) {
       return undefined;
     }
 
@@ -320,7 +442,9 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
         texture.magFilter = LinearFilter;
         material.map?.dispose();
         material.map = texture;
+        depthMaterial.map = texture;
         material.needsUpdate = true;
+        depthMaterial.needsUpdate = true;
         setIsLoading(false);
       },
       undefined,
@@ -337,6 +461,37 @@ export const PanoViewer = forwardRef<PanoViewerHandle, PanoViewerProps>(function
       loadedTexture?.dispose();
     };
   }, [imageUrl]);
+
+  useEffect(() => {
+    const depthGeometry = depthGeometryRef.current;
+    const baseDepthPositions = baseDepthPositionsRef.current;
+    if (!depthGeometry || !baseDepthPositions) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    if (!depthMapUrl) {
+      applyDepthProxy(depthGeometry, baseDepthPositions, null);
+      return undefined;
+    }
+
+    loadDepthSample(depthMapUrl)
+      .then((depthSample) => {
+        if (!cancelled) {
+          applyDepthProxy(depthGeometry, baseDepthPositions, depthSample);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          applyDepthProxy(depthGeometry, baseDepthPositions, null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [depthMapUrl]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
